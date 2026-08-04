@@ -1,20 +1,41 @@
 /* =========================================================
-   Expense Tracker — Application Logic
+   Expense Tracker — Application Logic (v2)
    Vanilla JS, LocalStorage persistence, offline-first.
+
+   v2 change: storage moved from a single flat
+   {income, expenses} shape to a month-based history:
+
+     {
+       currentMonth: "2026-08",
+       months: {
+         "2026-08": { income: 75000, expenses: [...] },
+         "2026-09": { income: 80000, expenses: [...] }
+       }
+     }
+
+   A one-time migration (see MIGRATION section) converts any
+   existing v1 data into this shape the first time v2 code runs,
+   without ever touching data that has already been migrated.
    ========================================================= */
 
 (() => {
   "use strict";
 
   /* ---------------------------------------------------------
-     Storage keys & helpers
+     Storage keys
      --------------------------------------------------------- */
-  const STORAGE_KEYS = {
+
+  // v1 (legacy, flat, single-month) keys — read-only, used for migration.
+  const LEGACY_KEYS = {
     income: "expenseTracker.income",
     expenses: "expenseTracker.expenses",
   };
 
-  const load = (key, fallback) => {
+  // v2 (current) key — the entire app state lives under one key so it can
+  // be written atomically (no risk of income and months getting out of sync).
+  const DATA_KEY = "expenseTracker.data";
+
+  const readJSON = (key, fallback) => {
     try {
       const raw = localStorage.getItem(key);
       return raw === null ? fallback : JSON.parse(raw);
@@ -24,24 +45,152 @@
     }
   };
 
-  const save = (key, value) => {
+  const writeJSON = (key, value) => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      return true;
     } catch (e) {
       console.warn("Failed to write storage key", key, e);
+      return false;
     }
   };
 
   /* ---------------------------------------------------------
+     Month key helpers ("YYYY-MM")
+     --------------------------------------------------------- */
+
+  const monthKeyOf = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+  const currentMonthKey = () => monthKeyOf(new Date());
+
+  const monthKeyToLabel = (key) => {
+    const [y, m] = key.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("en-IN", {
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const addMonthsToKey = (key, delta) => {
+    const [y, m] = key.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    return monthKeyOf(d);
+  };
+
+  /* ---------------------------------------------------------
+     MIGRATION — v1 (flat) -> v2 (month-based)
+
+     Runs automatically, exactly once, with no user interaction.
+
+     Rules enforced here:
+       1. Only migrates if v2 data does NOT already exist (idempotent —
+          safe to call on every launch, it only does real work once).
+       2. Reads the old keys, never mutates them until the new format
+          has been written and verified.
+       3. The user's existing income/expenses become the *first* month
+          in history, keyed by the current calendar month.
+       4. Old keys are removed ONLY after the new format is confirmed
+          saved (readback check), so a failed write never loses data.
+       5. Never invents or duplicates expenses — the old expenses array
+          is copied across as-is, once.
+     --------------------------------------------------------- */
+
+  const migrateLegacyDataIfNeeded = () => {
+    // Step 1: if v2 data already exists, migration already happened (or
+    // this is not a legacy user) — do nothing.
+    const alreadyMigrated = localStorage.getItem(DATA_KEY) !== null;
+    if (alreadyMigrated) return;
+
+    const hasLegacyIncome = localStorage.getItem(LEGACY_KEYS.income) !== null;
+    const hasLegacyExpenses = localStorage.getItem(LEGACY_KEYS.expenses) !== null;
+
+    if (!hasLegacyIncome && !hasLegacyExpenses) {
+      // Fresh install — nothing to migrate, v2 will initialize normally.
+      return;
+    }
+
+    // Step 2: read the legacy values defensively.
+    const legacyIncome = readJSON(LEGACY_KEYS.income, null);
+    const legacyExpenses = readJSON(LEGACY_KEYS.expenses, []);
+    const safeExpenses = Array.isArray(legacyExpenses) ? legacyExpenses : [];
+
+    // Step 3: the existing data becomes the first month in history,
+    // labeled with the current calendar month (e.g. "2026-08").
+    const monthKey = currentMonthKey();
+    const migratedData = {
+      currentMonth: monthKey,
+      months: {
+        [monthKey]: {
+          income: legacyIncome,
+          expenses: safeExpenses,
+        },
+      },
+    };
+
+    // Step 4: write the new format, then verify it actually landed before
+    // touching the old keys. If the write or verification fails, we bail
+    // out and keep the legacy keys intact — the app still falls back to
+    // reading them next launch since DATA_KEY won't exist.
+    const writeOk = writeJSON(DATA_KEY, migratedData);
+    const verify = readJSON(DATA_KEY, null);
+    const verifyOk =
+      writeOk &&
+      verify &&
+      verify.months &&
+      verify.months[monthKey] &&
+      Array.isArray(verify.months[monthKey].expenses) &&
+      verify.months[monthKey].expenses.length === safeExpenses.length;
+
+    if (verifyOk) {
+      // Step 5: only now is it safe to remove the old, now-redundant keys.
+      localStorage.removeItem(LEGACY_KEYS.income);
+      localStorage.removeItem(LEGACY_KEYS.expenses);
+      console.info(
+        `[migration] Legacy data migrated into month "${monthKey}" and old keys removed.`
+      );
+    } else {
+      console.warn(
+        "[migration] Could not verify migrated data — legacy keys were kept as a safety net."
+      );
+    }
+  };
+
+  migrateLegacyDataIfNeeded();
+
+  /* ---------------------------------------------------------
      State
      --------------------------------------------------------- */
-  const state = {
-    income: load(STORAGE_KEYS.income, null), // number | null
-    expenses: load(STORAGE_KEYS.expenses, []), // [{id, name, amount, type, date}]
+
+  const loadedData = readJSON(DATA_KEY, null);
+
+  const state = loadedData
+    ? loadedData
+    : {
+        currentMonth: currentMonthKey(),
+        months: {},
+      };
+
+  const saveData = () => writeJSON(DATA_KEY, state);
+
+  // Ensure a month record exists (used for the current month, and for any
+  // month the user navigates to) — never overwrites existing data.
+  const ensureMonth = (key) => {
+    if (!state.months[key]) {
+      state.months[key] = { income: null, expenses: [] };
+    }
+    return state.months[key];
   };
+
+  ensureMonth(state.currentMonth);
+
+  const sortedMonthKeys = () => Object.keys(state.months).sort();
+
+  const getCurrentMonthData = () => ensureMonth(state.currentMonth);
 
   let pendingEditId = null; // expense currently being edited (null = adding new)
   let pendingDeleteId = null; // expense pending delete confirmation
+  let pendingNewMonthKey = null; // month key about to be created
   let selectedType = "recurring"; // currently selected type in the expense sheet
 
   /* ---------------------------------------------------------
@@ -51,17 +200,19 @@
 
   const els = {
     savingsAmount: $("savingsAmount"),
-    savingsBadge: $("savingsBadge"),
-    savingsBadgeValue: $("savingsBadgeValue"),
-    badgeArrow: $("badgeArrow"),
     heroSub: $("heroSub"),
     incomeValue: $("incomeValue"),
     expensesValue: $("expensesValue"),
     rateValue: $("rateValue"),
     incomeStat: $("incomeStat"),
 
-    resetMonthBtn: $("resetMonthBtn"),
+    monthSelector: $("monthSelector"),
+    monthLabel: $("monthLabel"),
+    prevMonthBtn: $("prevMonthBtn"),
+    nextMonthBtn: $("nextMonthBtn"),
+
     downloadPdfBtn: $("downloadPdfBtn"),
+    downloadPdfSub: $("downloadPdfSub"),
     addExpenseBtn: $("addExpenseBtn"),
 
     recurringGroup: $("recurringGroup"),
@@ -85,9 +236,11 @@
     saveExpenseBtn: $("saveExpenseBtn"),
     cancelExpenseBtn: $("cancelExpenseBtn"),
 
-    resetOverlay: $("resetOverlay"),
-    cancelResetBtn: $("cancelResetBtn"),
-    confirmResetBtn: $("confirmResetBtn"),
+    newMonthOverlay: $("newMonthOverlay"),
+    newMonthName: $("newMonthName"),
+    newMonthPrevName: $("newMonthPrevName"),
+    cancelNewMonthBtn: $("cancelNewMonthBtn"),
+    confirmNewMonthBtn: $("confirmNewMonthBtn"),
 
     deleteOverlay: $("deleteOverlay"),
     deleteDesc: $("deleteDesc"),
@@ -180,13 +333,14 @@
   const editIconSVG = `<svg viewBox="0 0 24 24" fill="none"><path d="M14.7 6.3a4 4 0 015.7 5l-9.2 9.2-5 1 1-5 9.2-9.2" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 
   /* ---------------------------------------------------------
-     Derived calculations
+     Derived calculations (always for the SELECTED month)
      --------------------------------------------------------- */
   const totals = () => {
-    const income = state.income || 0;
+    const monthData = getCurrentMonthData();
+    const income = monthData.income || 0;
     let recurring = 0;
     let oneTime = 0;
-    for (const e of state.expenses) {
+    for (const e of monthData.expenses) {
       if (e.type === "recurring") recurring += e.amount;
       else oneTime += e.amount;
     }
@@ -208,39 +362,44 @@
     const rateClamped = Math.max(-999, Math.min(999, t.rate));
     els.rateValue.textContent = rateClamped.toFixed(1);
 
-    const badgeRate = Math.max(-99, Math.min(999, t.rate));
-    els.savingsBadgeValue.textContent = `${badgeRate.toFixed(1)}%`;
-
     if (t.savings < 0) {
-      els.savingsBadge.style.background = "var(--danger-tint)";
-      els.savingsBadge.style.color = "var(--danger)";
-      els.savingsBadge.style.borderColor = "rgba(255,77,77,0.18)";
-      els.badgeArrow.style.transform = "scaleY(-1)";
       els.heroSub.textContent = "You're spending more than you earn ⚠️";
     } else if (t.income === 0) {
-      els.savingsBadge.style.background = "var(--primary-tint)";
-      els.savingsBadge.style.color = "var(--primary)";
-      els.savingsBadge.style.borderColor = "rgba(57,255,20,0.18)";
-      els.badgeArrow.style.transform = "none";
       els.heroSub.textContent = "Add your income to get started 🚀";
     } else if (t.rate >= 40) {
-      els.savingsBadge.style.background = "var(--primary-tint)";
-      els.savingsBadge.style.color = "var(--primary)";
-      els.savingsBadge.style.borderColor = "rgba(57,255,20,0.18)";
-      els.badgeArrow.style.transform = "none";
       els.heroSub.textContent = "You're doing great! Keep it up 🚀";
     } else if (t.rate >= 15) {
-      els.savingsBadge.style.background = "var(--primary-tint)";
-      els.savingsBadge.style.color = "var(--primary)";
-      els.savingsBadge.style.borderColor = "rgba(57,255,20,0.18)";
-      els.badgeArrow.style.transform = "none";
       els.heroSub.textContent = "Solid progress this month 👍";
     } else {
-      els.savingsBadge.style.background = "rgba(255,255,255,0.08)";
-      els.savingsBadge.style.color = "var(--text-dim)";
-      els.savingsBadge.style.borderColor = "var(--border-strong)";
-      els.badgeArrow.style.transform = "none";
       els.heroSub.textContent = "Try to save a little more this month";
+    }
+  };
+
+  const renderMonthSelector = () => {
+    const keys = sortedMonthKeys();
+    const idx = keys.indexOf(state.currentMonth);
+    const isLatest = idx === keys.length - 1;
+
+    els.monthLabel.textContent = monthKeyToLabel(state.currentMonth);
+    els.prevMonthBtn.disabled = idx <= 0;
+
+    const iconNext = els.nextMonthBtn.querySelector(".icon-next");
+    const iconPlus = els.nextMonthBtn.querySelector(".icon-plus");
+
+    if (isLatest) {
+      iconNext.hidden = true;
+      iconPlus.hidden = false;
+      els.nextMonthBtn.classList.add("is-create");
+      els.nextMonthBtn.setAttribute("aria-label", "Create next month");
+    } else {
+      iconNext.hidden = false;
+      iconPlus.hidden = true;
+      els.nextMonthBtn.classList.remove("is-create");
+      els.nextMonthBtn.setAttribute("aria-label", "Next month");
+    }
+
+    if (els.downloadPdfSub) {
+      els.downloadPdfSub.textContent = `Export ${monthKeyToLabel(state.currentMonth)}`;
     }
   };
 
@@ -279,24 +438,27 @@
 
   const renderExpenses = () => {
     const t = totals();
+    const monthData = getCurrentMonthData();
+
     els.recurringTotal.textContent = formatINR(t.recurring);
     els.oneTimeTotal.textContent = formatINR(t.oneTime);
 
     els.recurringList.innerHTML = "";
     els.oneTimeList.innerHTML = "";
 
-    const recurring = state.expenses.filter((e) => e.type === "recurring");
-    const oneTime = state.expenses.filter((e) => e.type === "onetime");
+    const recurring = monthData.expenses.filter((e) => e.type === "recurring");
+    const oneTime = monthData.expenses.filter((e) => e.type === "onetime");
 
     recurring.forEach((e) => els.recurringList.appendChild(buildExpenseCard(e)));
     oneTime.forEach((e) => els.oneTimeList.appendChild(buildExpenseCard(e)));
 
     els.recurringGroup.hidden = recurring.length === 0;
     els.oneTimeGroup.hidden = oneTime.length === 0;
-    els.emptyState.hidden = state.expenses.length !== 0;
+    els.emptyState.hidden = monthData.expenses.length !== 0;
   };
 
   const renderAll = () => {
+    renderMonthSelector();
     renderHero();
     renderExpenses();
   };
@@ -316,7 +478,7 @@
   };
 
   // Close on backdrop click
-  [els.incomeOverlay, els.expenseOverlay, els.resetOverlay, els.deleteOverlay].forEach((overlay) => {
+  [els.incomeOverlay, els.expenseOverlay, els.newMonthOverlay, els.deleteOverlay].forEach((overlay) => {
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) closeSheet(overlay);
     });
@@ -329,13 +491,96 @@
   });
 
   /* ---------------------------------------------------------
-     Income modal
+     Month navigation
+     --------------------------------------------------------- */
+  const switchMonth = (key) => {
+    ensureMonth(key);
+    state.currentMonth = key;
+    saveData();
+
+    // Brief fade on the label so the change reads as intentional, not a jump-cut.
+    els.monthLabel.classList.add("switching");
+    requestAnimationFrame(() => {
+      renderAll();
+      requestAnimationFrame(() => els.monthLabel.classList.remove("switching"));
+    });
+  };
+
+  els.prevMonthBtn.addEventListener("click", () => {
+    const keys = sortedMonthKeys();
+    const idx = keys.indexOf(state.currentMonth);
+    if (idx > 0) switchMonth(keys[idx - 1]);
+  });
+
+  els.nextMonthBtn.addEventListener("click", () => {
+    const keys = sortedMonthKeys();
+    const idx = keys.indexOf(state.currentMonth);
+    if (idx < keys.length - 1) {
+      switchMonth(keys[idx + 1]);
+    } else {
+      openNewMonthModal();
+    }
+  });
+
+  /* ---------------------------------------------------------
+     New Month modal
+     (replaces the old "Reset Month" flow — creates the next
+     month, copying income + recurring expenses, and leaving
+     one-time expenses behind in the current month, untouched)
+     --------------------------------------------------------- */
+  const openNewMonthModal = () => {
+    pendingNewMonthKey = addMonthsToKey(state.currentMonth, 1);
+    els.newMonthName.textContent = monthKeyToLabel(pendingNewMonthKey);
+    els.newMonthPrevName.textContent = monthKeyToLabel(state.currentMonth);
+    openSheet(els.newMonthOverlay);
+  };
+
+  els.cancelNewMonthBtn.addEventListener("click", () => {
+    pendingNewMonthKey = null;
+    closeSheet(els.newMonthOverlay);
+  });
+
+  els.confirmNewMonthBtn.addEventListener("click", () => {
+    if (!pendingNewMonthKey) return;
+    const newKey = pendingNewMonthKey;
+    const sourceData = getCurrentMonthData();
+
+    // Recurring expenses become independent records in the new month —
+    // cloned with brand-new ids so editing one never touches the other.
+    const clonedRecurring = sourceData.expenses
+      .filter((e) => e.type === "recurring")
+      .map((e) => ({
+        id: uid(),
+        name: e.name,
+        amount: e.amount,
+        type: "recurring",
+        date: todayLabel(),
+      }));
+
+    // The source month (state.currentMonth) is left completely untouched —
+    // we only ever read from it above, never mutate it.
+    state.months[newKey] = {
+      income: sourceData.income, // copied, independent from here on
+      expenses: clonedRecurring, // one-time expenses intentionally excluded
+    };
+
+    state.currentMonth = newKey;
+    saveData();
+    closeSheet(els.newMonthOverlay);
+    pendingNewMonthKey = null;
+    renderAll();
+    showToast(`${monthKeyToLabel(newKey)} created`);
+  });
+
+  /* ---------------------------------------------------------
+     Income modal (edits ONLY the selected month's income)
      --------------------------------------------------------- */
   const openIncomeModal = (isFirstLaunch = false) => {
-    els.incomeInput.value = state.income ?? "";
+    const monthData = getCurrentMonthData();
+    els.incomeInput.value = monthData.income ?? "";
     els.incomeDesc.textContent = isFirstLaunch
       ? "Welcome! Let's set up your monthly income to get started."
-      : "How much do you earn this month? You can update this anytime.";
+      : `How much do you earn in ${monthKeyToLabel(state.currentMonth)}? You can update this anytime.`;
     openSheet(els.incomeOverlay);
     setTimeout(() => els.incomeInput.focus(), 260);
   };
@@ -349,11 +594,11 @@
       showToast("Enter a valid income amount");
       return;
     }
-    state.income = val;
-    save(STORAGE_KEYS.income, state.income);
+    getCurrentMonthData().income = val;
+    saveData();
     closeSheet(els.incomeOverlay);
     renderAll();
-    els.savingsAmount.parentElement.parentElement.classList.remove("pulse");
+    document.getElementById("heroCard").classList.remove("pulse");
     void els.savingsAmount.offsetWidth;
     document.getElementById("heroCard").classList.add("pulse");
     showToast("Income updated");
@@ -364,7 +609,7 @@
   });
 
   /* ---------------------------------------------------------
-     Expense sheet (add / edit)
+     Expense sheet (add / edit) — always targets the selected month
      --------------------------------------------------------- */
   const setSelectedType = (type) => {
     selectedType = type;
@@ -390,7 +635,7 @@
   };
 
   const openEditExpense = (id) => {
-    const expense = state.expenses.find((e) => e.id === id);
+    const expense = getCurrentMonthData().expenses.find((e) => e.id === id);
     if (!expense) return;
     pendingEditId = id;
     els.expenseTitle.textContent = "Edit Expense";
@@ -419,8 +664,10 @@
       return;
     }
 
+    const monthData = getCurrentMonthData();
+
     if (pendingEditId) {
-      const expense = state.expenses.find((e) => e.id === pendingEditId);
+      const expense = monthData.expenses.find((e) => e.id === pendingEditId);
       if (expense) {
         expense.name = name;
         expense.amount = amount;
@@ -428,7 +675,7 @@
       }
       showToast("Expense updated");
     } else {
-      state.expenses.unshift({
+      monthData.expenses.unshift({
         id: uid(),
         name,
         amount,
@@ -438,16 +685,16 @@
       showToast("Expense added");
     }
 
-    save(STORAGE_KEYS.expenses, state.expenses);
+    saveData();
     closeSheet(els.expenseOverlay);
     renderAll();
   });
 
   /* ---------------------------------------------------------
-     Delete confirmation
+     Delete confirmation — deletes only from the selected month
      --------------------------------------------------------- */
   const openDeleteConfirm = (id) => {
-    const expense = state.expenses.find((e) => e.id === id);
+    const expense = getCurrentMonthData().expenses.find((e) => e.id === id);
     if (!expense) return;
     pendingDeleteId = id;
     els.deleteDesc.innerHTML = `This will permanently remove <strong>${escapeHTML(expense.name)}</strong>.`;
@@ -466,8 +713,9 @@
     closeSheet(els.deleteOverlay);
 
     const finish = () => {
-      state.expenses = state.expenses.filter((e) => e.id !== idToDelete);
-      save(STORAGE_KEYS.expenses, state.expenses);
+      const monthData = getCurrentMonthData();
+      monthData.expenses = monthData.expenses.filter((e) => e.id !== idToDelete);
+      saveData();
       renderAll();
       showToast("Expense deleted");
     };
@@ -482,20 +730,6 @@
   });
 
   /* ---------------------------------------------------------
-     Reset month
-     --------------------------------------------------------- */
-  els.resetMonthBtn.addEventListener("click", () => openSheet(els.resetOverlay));
-  els.cancelResetBtn.addEventListener("click", () => closeSheet(els.resetOverlay));
-
-  els.confirmResetBtn.addEventListener("click", () => {
-    state.expenses = state.expenses.filter((e) => e.type === "recurring");
-    save(STORAGE_KEYS.expenses, state.expenses);
-    closeSheet(els.resetOverlay);
-    renderAll();
-    showToast("New month started");
-  });
-
-  /* ---------------------------------------------------------
      Group collapsing
      --------------------------------------------------------- */
   document.querySelectorAll(".group-header").forEach((header) => {
@@ -506,17 +740,14 @@
   });
 
   /* ---------------------------------------------------------
-     PDF export
+     PDF export — always exports the currently selected month
      --------------------------------------------------------- */
-  const monthYearLabel = () => {
-    const d = new Date();
-    return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-  };
-
   const buildPDF = () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const t = totals();
+    const monthData = getCurrentMonthData();
+    const monthLabel = monthKeyToLabel(state.currentMonth);
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 48;
@@ -537,7 +768,7 @@
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
     doc.setTextColor(180, 180, 180);
-    doc.text(`Monthly Report — ${monthYearLabel()}`, margin, 74);
+    doc.text(`Monthly Report — ${monthLabel}`, margin, 74);
     doc.setTextColor(...GREEN);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
@@ -627,8 +858,8 @@
       y += 12;
     };
 
-    const recurring = state.expenses.filter((e) => e.type === "recurring");
-    const oneTime = state.expenses.filter((e) => e.type === "onetime");
+    const recurring = monthData.expenses.filter((e) => e.type === "recurring");
+    const oneTime = monthData.expenses.filter((e) => e.type === "onetime");
 
     drawSectionTable("Recurring Expenses", recurring, t.recurring);
     drawSectionTable("One-time Expenses", oneTime, t.oneTime);
@@ -651,7 +882,7 @@
     doc.setFontSize(10.5);
     doc.text(`${t.rate.toFixed(1)}% of income saved`, pageWidth - margin - 18, y + 40, { align: "right" });
 
-    return doc;
+    return { doc, monthLabel };
   };
 
   els.downloadPdfBtn.addEventListener("click", () => {
@@ -660,8 +891,8 @@
         showToast("PDF library not available offline yet");
         return;
       }
-      const doc = buildPDF();
-      const filename = `Expense_Report_${monthYearLabel().replace(" ", "_")}.pdf`;
+      const { doc, monthLabel } = buildPDF();
+      const filename = `Expense_Report_${monthLabel.replace(" ", "_")}.pdf`;
       doc.save(filename);
       showToast("PDF downloaded");
     } catch (err) {
@@ -672,10 +903,13 @@
 
   /* ---------------------------------------------------------
      First launch check
+     (only prompts when the SELECTED month has no income set —
+     migrated users already have income and are never prompted)
      --------------------------------------------------------- */
   const init = () => {
     renderAll();
-    if (state.income === null || state.income === undefined) {
+    const monthData = getCurrentMonthData();
+    if (monthData.income === null || monthData.income === undefined) {
       openIncomeModal(true);
     }
   };
