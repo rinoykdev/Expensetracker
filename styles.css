@@ -168,6 +168,68 @@ input{
 
 .badge-arrow{ width: 14px; height: 14px; }
 
+/* =========================================================
+   Month Selector (replaces the savings % badge)
+   ========================================================= */
+
+.month-selector{
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.month-nav-btn{
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.month-nav-btn svg{ width: 15px; height: 15px; }
+.month-nav-btn:hover{ background: rgba(255,255,255,0.08); color: var(--text); }
+.month-nav-btn:active{ transform: scale(0.9); }
+
+.month-nav-btn:disabled{
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.month-nav-btn.is-create{
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+.month-nav-btn.is-create:hover{ background: var(--primary-tint); filter: brightness(1.15); }
+
+.month-label{
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0 8px;
+  white-space: nowrap;
+  min-width: 88px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 180ms ease;
+}
+
+.month-label.switching{ opacity: 0; }
+
+/* =========================================================
+   Single-item action grid (Download PDF only)
+   ========================================================= */
+
+.action-grid--single{
+  grid-template-columns: 1fr;
+}
+
 .hero-amount{
   margin-top: 14px;
   display: flex;
@@ -594,6 +656,37 @@ button.stat:active{ transform: scale(0.97); }
 .warn-icon svg{ width: 24px; height: 24px; }
 .warn-icon--delete{ background: var(--danger-tint); color: var(--danger); }
 #resetSheet .warn-icon{ background: var(--primary-tint); color: var(--primary); }
+
+.check-list{
+  list-style: none;
+  margin: 4px 0 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.check-list li{
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.check-list li svg{
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--primary-tint);
+  color: var(--primary);
+  box-sizing: content-box;
+}
+
+.check-list li span{ color: var(--text); }
 
 .field{ margin-bottom: 18px; }
 
