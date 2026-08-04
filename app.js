@@ -333,6 +333,59 @@
   const editIconSVG = `<svg viewBox="0 0 24 24" fill="none"><path d="M14.7 6.3a4 4 0 015.7 5l-9.2 9.2-5 1 1-5 9.2-9.2" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 
   /* ---------------------------------------------------------
+     Rotating motivational quotes (hero-sub, below Monthly Savings)
+
+     - Rotates every 3s with a smooth fade-out/fade-in.
+     - Random order, but never repeats the immediately-previous quote.
+     - Runs independently of renderHero() so re-renders (switching
+       months, editing expenses, etc.) never interrupt or reset it.
+     --------------------------------------------------------- */
+  const MOTIVATIONAL_QUOTES = [
+    "Money grows with patience 🌱",
+    "Small wins become fortunes ✨",
+    "Every rupee has a purpose 💚",
+    "Consistency beats intensity ⚡",
+    "Saving today, freedom tomorrow 🌿",
+    "Little by little, wealth grows 🌳",
+    "Progress over perfection 🚀",
+    "Future you says thanks 🙌",
+    "Smart habits compound daily 📈",
+    "Stay steady, stay saving 🌿",
+    "You're building something great 💎",
+    "Discipline creates freedom 🔥",
+    "Track it, then trust it 🧭",
+    "Small savings, big dreams 🌟",
+    "Every month is a fresh start 🌱",
+  ];
+
+  const FADE_MS = 380;
+  const ROTATE_MS = 3000;
+  let lastQuoteIndex = -1;
+
+  const pickNextQuote = () => {
+    if (MOTIVATIONAL_QUOTES.length <= 1) return MOTIVATIONAL_QUOTES[0];
+    let idx;
+    do {
+      idx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
+    } while (idx === lastQuoteIndex);
+    lastQuoteIndex = idx;
+    return MOTIVATIONAL_QUOTES[idx];
+  };
+
+  const rotateQuote = () => {
+    els.heroSub.classList.add("fading");
+    setTimeout(() => {
+      els.heroSub.textContent = pickNextQuote();
+      els.heroSub.classList.remove("fading");
+    }, FADE_MS);
+  };
+
+  const initQuoteRotator = () => {
+    els.heroSub.textContent = pickNextQuote();
+    setInterval(rotateQuote, ROTATE_MS);
+  };
+
+  /* ---------------------------------------------------------
      Derived calculations (always for the SELECTED month)
      --------------------------------------------------------- */
   const totals = () => {
@@ -361,18 +414,8 @@
     els.expensesValue.textContent = formatINR(t.expenses);
     const rateClamped = Math.max(-999, Math.min(999, t.rate));
     els.rateValue.textContent = rateClamped.toFixed(1);
-
-    if (t.savings < 0) {
-      els.heroSub.textContent = "You're spending more than you earn ⚠️";
-    } else if (t.income === 0) {
-      els.heroSub.textContent = "Add your income to get started 🚀";
-    } else if (t.rate >= 40) {
-      els.heroSub.textContent = "You're doing great! Keep it up 🚀";
-    } else if (t.rate >= 15) {
-      els.heroSub.textContent = "Solid progress this month 👍";
-    } else {
-      els.heroSub.textContent = "Try to save a little more this month";
-    }
+    // hero-sub text is no longer state-dependent — see the rotating
+    // motivational quotes carousel set up in initQuoteRotator().
   };
 
   const renderMonthSelector = () => {
@@ -908,6 +951,7 @@
      --------------------------------------------------------- */
   const init = () => {
     renderAll();
+    initQuoteRotator();
     const monthData = getCurrentMonthData();
     if (monthData.income === null || monthData.income === undefined) {
       openIncomeModal(true);
