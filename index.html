@@ -31,13 +31,20 @@
         <section class="hero-card" id="heroCard">
           <div class="hero-top">
             <span class="hero-label">Monthly Savings</span>
-            <span class="hero-badge" id="savingsBadge">
-              <span id="savingsBadgeValue">0%</span>
-              <svg class="badge-arrow" viewBox="0 0 24 24" fill="none" id="badgeArrow">
-                <path d="M4 15L10 9L14 13L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M14 6H20V12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+
+            <!-- Month Selector: swipe between any previously created month.
+                 The next-month button morphs into a "+" when the selected
+                 month is the latest one, offering month creation inline. -->
+            <div class="month-selector" id="monthSelector">
+              <button class="month-nav-btn" id="prevMonthBtn" aria-label="Previous month" type="button">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <span class="month-label" id="monthLabel">Month Year</span>
+              <button class="month-nav-btn" id="nextMonthBtn" aria-label="Next month" type="button">
+                <svg class="icon-next" viewBox="0 0 24 24" fill="none"><path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="icon-plus" viewBox="0 0 24 24" fill="none" hidden><path d="M12 5V19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M5 12H19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+              </button>
+            </div>
           </div>
 
           <div class="hero-amount">
@@ -77,24 +84,14 @@
         </section>
 
         <!-- Action Buttons -->
-        <section class="action-grid">
-          <button class="action-btn" id="resetMonthBtn">
-            <span class="action-icon action-icon--reset">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M4 12C4 7.58172 7.58172 4 12 4C15.0264 4 17.6544 5.69072 19 8.19168" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 4V8.5H15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12C20 16.4183 16.4183 20 12 20C8.97357 20 6.34558 18.3093 5 15.8083" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20V15.5H8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </span>
-            <span class="action-text">
-              <span class="action-title">Reset Month</span>
-              <span class="action-sub">Start fresh</span>
-            </span>
-          </button>
-
+        <section class="action-grid action-grid--single">
           <button class="action-btn" id="downloadPdfBtn">
             <span class="action-icon action-icon--pdf">
               <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H7C5.89543 2 5 2.89543 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 2V7H19" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
             </span>
             <span class="action-text">
               <span class="action-title">Download PDF</span>
-              <span class="action-sub">Full monthly report</span>
+              <span class="action-sub" id="downloadPdfSub">Full monthly report</span>
             </span>
           </button>
         </section>
@@ -208,22 +205,33 @@
       </div>
     </div>
 
-    <!-- ===================== RESET MONTH MODAL ===================== -->
-    <div class="sheet-overlay" id="resetOverlay">
-      <div class="sheet sheet--center" id="resetSheet" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+    <!-- ===================== NEW MONTH MODAL ===================== -->
+    <div class="sheet-overlay" id="newMonthOverlay">
+      <div class="sheet sheet--center" id="newMonthSheet" role="dialog" aria-modal="true" aria-labelledby="newMonthTitle">
         <div class="sheet-grabber"></div>
-        <div class="warn-icon">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 9V13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="1.05" fill="currentColor"/><path d="M10.29 3.86L1.82 18A1.5 1.5 0 003.11 20.5H20.89A1.5 1.5 0 0022.18 18L13.71 3.86A1.5 1.5 0 0010.29 3.86Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <div class="warn-icon" id="newMonthIcon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5V19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M5 12H19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
         </div>
-        <h2 class="sheet-title" id="resetTitle">Start New Month?</h2>
-        <p class="sheet-desc">
-          <strong>Recurring expenses</strong> will remain.<br/>
-          <strong>One-time expenses</strong> will be deleted.
-        </p>
+        <h2 class="sheet-title" id="newMonthTitle">Create <span id="newMonthName">Month Year</span>?</h2>
+
+        <ul class="check-list">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Copy Monthly Income</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Copy Recurring Expenses</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Leave One-time Expenses in <span id="newMonthPrevName">Month Year</span></span>
+          </li>
+        </ul>
 
         <div class="sheet-actions">
-          <button class="btn btn-ghost" id="cancelResetBtn">Cancel</button>
-          <button class="btn btn-danger" id="confirmResetBtn">Reset</button>
+          <button class="btn btn-ghost" id="cancelNewMonthBtn">Cancel</button>
+          <button class="btn btn-primary" id="confirmNewMonthBtn">Create</button>
         </div>
       </div>
     </div>
