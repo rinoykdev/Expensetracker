@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <title>Expense Tracker</title>
+  <meta name="description" content="A premium, private, offline-first expense tracker." />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0B0B0B" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Expenses" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div class="app" id="app">
+
+    <!-- ===================== MAIN SCREEN ===================== -->
+    <main class="screen" id="mainScreen">
+
+      <div class="container">
+
+        <!-- Hero Card -->
+        <section class="hero-card" id="heroCard">
+          <div class="hero-top">
+            <span class="hero-label">Monthly Savings</span>
+            <span class="hero-badge" id="savingsBadge">
+              <span id="savingsBadgeValue">0%</span>
+              <svg class="badge-arrow" viewBox="0 0 24 24" fill="none" id="badgeArrow">
+                <path d="M4 15L10 9L14 13L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14 6H20V12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+
+          <div class="hero-amount">
+            <span class="hero-currency">₹</span>
+            <span id="savingsAmount">0</span>
+          </div>
+
+          <p class="hero-sub" id="heroSub">Add your income to get started 🚀</p>
+
+          <div class="hero-divider"></div>
+
+          <div class="hero-stats">
+            <button class="stat stat--income" id="incomeStat" aria-label="Edit monthly income">
+              <span class="stat-label">Income</span>
+              <span class="stat-value"><span class="rupee">₹</span> <span id="incomeValue">0</span></span>
+              <span class="stat-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M3 7C3 5.89543 3.89543 5 5 5H19C20.1046 5 21 5.89543 21 7V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z" stroke="currentColor" stroke-width="1.6"/><path d="M3 10H21" stroke="currentColor" stroke-width="1.6"/><circle cx="7" cy="14.5" r="1.1" fill="currentColor"/></svg>
+              </span>
+            </button>
+
+            <div class="stat stat--expenses" id="expensesStat">
+              <span class="stat-label">Expenses</span>
+              <span class="stat-value"><span class="rupee">₹</span> <span id="expensesValue">0</span></span>
+              <span class="stat-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 4V16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6 12L12 18L18 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 20H19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+            </div>
+
+            <div class="stat stat--rate" id="rateStat">
+              <span class="stat-label">Savings Rate</span>
+              <span class="stat-value"><span id="rateValue">0.0</span>%</span>
+              <span class="stat-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 2V12L19 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-width="1.6"/></svg>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Action Buttons -->
+        <section class="action-grid">
+          <button class="action-btn" id="resetMonthBtn">
+            <span class="action-icon action-icon--reset">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 12C4 7.58172 7.58172 4 12 4C15.0264 4 17.6544 5.69072 19 8.19168" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 4V8.5H15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12C20 16.4183 16.4183 20 12 20C8.97357 20 6.34558 18.3093 5 15.8083" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20V15.5H8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="action-text">
+              <span class="action-title">Reset Month</span>
+              <span class="action-sub">Start fresh</span>
+            </span>
+          </button>
+
+          <button class="action-btn" id="downloadPdfBtn">
+            <span class="action-icon action-icon--pdf">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H7C5.89543 2 5 2.89543 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 2V7H19" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="action-text">
+              <span class="action-title">Download PDF</span>
+              <span class="action-sub">Full monthly report</span>
+            </span>
+          </button>
+        </section>
+
+        <!-- Add Expense CTA -->
+        <button class="cta-btn" id="addExpenseBtn">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5V19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M5 12H19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          <span>Add Expense</span>
+        </button>
+
+        <!-- Expense Groups -->
+        <div id="expenseGroups">
+
+          <section class="expense-group" id="recurringGroup">
+            <button class="group-header" data-target="recurringList" data-empty-label="No recurring expenses yet">
+              <span class="group-title">Recurring Expenses</span>
+              <span class="group-meta">
+                <span class="group-total"><span class="rupee">₹</span> <span id="recurringTotal">0</span></span>
+                <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </button>
+            <div class="group-list" id="recurringList"></div>
+          </section>
+
+          <section class="expense-group" id="oneTimeGroup">
+            <button class="group-header" data-target="oneTimeList" data-empty-label="No one-time expenses yet">
+              <span class="group-title">One-time Expenses</span>
+              <span class="group-meta">
+                <span class="group-total"><span class="rupee">₹</span> <span id="oneTimeTotal">0</span></span>
+                <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </button>
+            <div class="group-list" id="oneTimeList"></div>
+          </section>
+
+          <div class="empty-state" id="emptyState" hidden>
+            <div class="empty-icon">🌱</div>
+            <p class="empty-title">No expenses yet</p>
+            <p class="empty-sub">Tap "Add Expense" to log your first one.</p>
+          </div>
+
+        </div>
+
+        <p class="privacy-note">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7.5C8 5.567 9.567 4 11.5 4H12.5C14.433 4 16 5.567 16 7.5V10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          All data is saved on your device only. 100% Private
+        </p>
+
+      </div>
+    </main>
+
+    <!-- ===================== INCOME MODAL ===================== -->
+    <div class="sheet-overlay" id="incomeOverlay">
+      <div class="sheet sheet--center" id="incomeSheet" role="dialog" aria-modal="true" aria-labelledby="incomeTitle">
+        <div class="sheet-grabber"></div>
+        <h2 class="sheet-title" id="incomeTitle">Set Monthly Income</h2>
+        <p class="sheet-desc" id="incomeDesc">How much do you earn this month? You can update this anytime.</p>
+
+        <div class="field">
+          <label class="field-label" for="incomeInput">Monthly Income</label>
+          <div class="input-wrap">
+            <span class="input-prefix">₹</span>
+            <input type="number" id="incomeInput" class="input" inputmode="decimal" placeholder="0" min="0" step="1" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="sheet-actions sheet-actions--single">
+          <button class="btn btn-primary" id="saveIncomeBtn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== ADD/EDIT EXPENSE BOTTOM SHEET ===================== -->
+    <div class="sheet-overlay" id="expenseOverlay">
+      <div class="sheet" id="expenseSheet" role="dialog" aria-modal="true" aria-labelledby="expenseTitle">
+        <div class="sheet-grabber"></div>
+        <h2 class="sheet-title" id="expenseTitle">Add Expense</h2>
+        <p class="sheet-desc">Log where your money went.</p>
+
+        <div class="field">
+          <label class="field-label" for="expenseNameInput">Expense Name</label>
+          <input type="text" id="expenseNameInput" class="input" placeholder="e.g. Groceries" autocomplete="off" maxlength="40" />
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="expenseAmountInput">Amount</label>
+          <div class="input-wrap">
+            <span class="input-prefix">₹</span>
+            <input type="number" id="expenseAmountInput" class="input" inputmode="decimal" placeholder="0" min="0" step="1" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Expense Type</span>
+          <div class="segmented" id="expenseTypeSegment" role="radiogroup" aria-label="Expense Type">
+            <button type="button" class="segment active" data-type="recurring" role="radio" aria-checked="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 12C4 7.58172 7.58172 4 12 4C15.0264 4 17.6544 5.69072 19 8.19168" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 4V8.5H15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12C20 16.4183 16.4183 20 12 20C8.97357 20 6.34558 18.3093 5 15.8083" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20V15.5H8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Recurring
+            </button>
+            <button type="button" class="segment" data-type="onetime" role="radio" aria-checked="false">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12L14.5 14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              One Time
+            </button>
+          </div>
+        </div>
+
+        <div class="sheet-actions">
+          <button class="btn btn-ghost" id="cancelExpenseBtn">Cancel</button>
+          <button class="btn btn-primary" id="saveExpenseBtn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== RESET MONTH MODAL ===================== -->
+    <div class="sheet-overlay" id="resetOverlay">
+      <div class="sheet sheet--center" id="resetSheet" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+        <div class="sheet-grabber"></div>
+        <div class="warn-icon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 9V13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="1.05" fill="currentColor"/><path d="M10.29 3.86L1.82 18A1.5 1.5 0 003.11 20.5H20.89A1.5 1.5 0 0022.18 18L13.71 3.86A1.5 1.5 0 0010.29 3.86Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 class="sheet-title" id="resetTitle">Start New Month?</h2>
+        <p class="sheet-desc">
+          <strong>Recurring expenses</strong> will remain.<br/>
+          <strong>One-time expenses</strong> will be deleted.
+        </p>
+
+        <div class="sheet-actions">
+          <button class="btn btn-ghost" id="cancelResetBtn">Cancel</button>
+          <button class="btn btn-danger" id="confirmResetBtn">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== DELETE CONFIRM MODAL ===================== -->
+    <div class="sheet-overlay" id="deleteOverlay">
+      <div class="sheet sheet--center" id="deleteSheet" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+        <div class="sheet-grabber"></div>
+        <div class="warn-icon warn-icon--delete">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 7H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 7V4.8C9 4.35817 9.35817 4 9.8 4H14.2C14.6418 4 15 4.35817 15 4.8V7" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 7L6.8 19.2C6.87 20.19 7.7 21 8.7 21H15.3C16.3 21 17.13 20.19 17.2 19.2L18 7" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 class="sheet-title" id="deleteTitle">Delete Expense?</h2>
+        <p class="sheet-desc" id="deleteDesc">This will permanently remove this expense.</p>
+
+        <div class="sheet-actions">
+          <button class="btn btn-ghost" id="cancelDeleteBtn">Cancel</button>
+          <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+  </div>
+
+  <script src="jspdf.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
