@@ -32,19 +32,12 @@
           <div class="hero-top">
             <span class="hero-label">Monthly Savings</span>
 
-            <!-- Month Selector: swipe between any previously created month.
-                 The next-month button morphs into a "+" when the selected
-                 month is the latest one, offering month creation inline. -->
-            <div class="month-selector" id="monthSelector">
-              <button class="month-nav-btn" id="prevMonthBtn" aria-label="Previous month" type="button">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </button>
+            <!-- Month Selector: opens a bottom sheet listing every stored
+                 month, newest first, with a Create New Month action. -->
+            <button class="month-selector" id="monthSelectorBtn" type="button" aria-haspopup="dialog">
               <span class="month-label" id="monthLabel">Month Year</span>
-              <button class="month-nav-btn" id="nextMonthBtn" aria-label="Next month" type="button">
-                <svg class="icon-next" viewBox="0 0 24 24" fill="none"><path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <svg class="icon-plus" viewBox="0 0 24 24" fill="none" hidden><path d="M12 5V19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M5 12H19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
-              </button>
-            </div>
+              <svg class="month-caret" viewBox="0 0 24 24" fill="none"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
           </div>
 
           <div class="hero-amount">
@@ -74,7 +67,7 @@
             </div>
 
             <div class="stat stat--rate" id="rateStat">
-              <span class="stat-label">Save %</span>
+              <span class="stat-label">Savings Rate</span>
               <span class="stat-value"><span id="rateValue">0.0</span>%</span>
               <span class="stat-icon">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M12 2V12L19 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -114,6 +107,11 @@
             <div class="group-list" id="oneTimeList"></div>
           </section>
 
+          <div class="empty-state" id="emptyState" hidden>
+            <div class="empty-icon">🌱</div>
+            <p class="empty-title">No expenses yet</p>
+            <p class="empty-sub">Tap "Add Expense" to log your first one.</p>
+          </div>
 
         </div>
 
@@ -198,33 +196,51 @@
       </div>
     </div>
 
-    <!-- ===================== NEW MONTH MODAL ===================== -->
-    <div class="sheet-overlay" id="newMonthOverlay">
-      <div class="sheet sheet--center" id="newMonthSheet" role="dialog" aria-modal="true" aria-labelledby="newMonthTitle">
+    <!-- ===================== MONTH PICKER SHEET ===================== -->
+    <div class="sheet-overlay" id="monthPickerOverlay">
+      <div class="sheet" id="monthPickerSheet" role="dialog" aria-modal="true" aria-labelledby="monthPickerTitle">
         <div class="sheet-grabber"></div>
-        <div class="warn-icon" id="newMonthIcon">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5V19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M5 12H19" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
-        </div>
-        <h2 class="sheet-title" id="newMonthTitle">Create <span id="newMonthName">Month Year</span>?</h2>
+        <h2 class="sheet-title" id="monthPickerTitle">Select Month</h2>
 
-        <ul class="check-list">
-          <li>
-            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>Copy Monthly Income</span>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>Copy Recurring Expenses</span>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>Leave One-time Expenses in <span id="newMonthPrevName">Month Year</span></span>
-          </li>
-        </ul>
+        <div class="month-picker-list" id="monthPickerList">
+          <!-- Month rows injected by app.js -->
+        </div>
+
+        <div class="month-picker-divider"></div>
+
+        <button class="month-picker-create" id="createMonthBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5V19" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M5 12H19" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <span>Create New Month</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===================== MONTH ROW ACTION SHEET (⋮ menu) ===================== -->
+    <div class="sheet-overlay" id="monthActionOverlay">
+      <div class="sheet sheet--center" id="monthActionSheet" role="dialog" aria-modal="true" aria-labelledby="monthActionTitle">
+        <div class="sheet-grabber"></div>
+        <h2 class="sheet-title" id="monthActionTitle" style="margin-bottom: 18px;">Month Options</h2>
+        <button class="action-sheet-btn action-sheet-btn--danger" id="deleteMonthMenuBtn" type="button">Delete Month</button>
+        <button class="action-sheet-btn" id="cancelMonthActionBtn" type="button">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ===================== DELETE MONTH CONFIRM MODAL ===================== -->
+    <div class="sheet-overlay" id="deleteMonthOverlay">
+      <div class="sheet sheet--center" id="deleteMonthSheet" role="dialog" aria-modal="true" aria-labelledby="deleteMonthTitle">
+        <div class="sheet-grabber"></div>
+        <div class="warn-icon warn-icon--delete">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 7H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 7V4.8C9 4.35817 9.35817 4 9.8 4H14.2C14.6418 4 15 4.35817 15 4.8V7" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 7L6.8 19.2C6.87 20.19 7.7 21 8.7 21H15.3C16.3 21 17.13 20.19 17.2 19.2L18 7" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 class="sheet-title" id="deleteMonthTitle">Delete <span id="deleteMonthName">Month Year</span>?</h2>
+        <p class="sheet-desc">
+          This will permanently delete all data for this month.<br />
+          This action cannot be undone.
+        </p>
 
         <div class="sheet-actions">
-          <button class="btn btn-ghost" id="cancelNewMonthBtn">Cancel</button>
-          <button class="btn btn-primary" id="confirmNewMonthBtn">Create</button>
+          <button class="btn btn-ghost" id="cancelDeleteMonthBtn">Cancel</button>
+          <button class="btn btn-danger" id="confirmDeleteMonthBtn">Delete</button>
         </div>
       </div>
     </div>
