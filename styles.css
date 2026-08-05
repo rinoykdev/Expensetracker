@@ -1,5 +1,5 @@
 /* =========================================================
-   Expense Tracker â€” Design System
+   Expense Tracker — Design System
    Dark / Neon Green / Glassmorphism / Premium mobile-first
    ========================================================= */
 
@@ -169,58 +169,159 @@ input{
 .badge-arrow{ width: 14px; height: 14px; }
 
 /* =========================================================
-   Month Selector (replaces the savings % badge)
+   Month Selector — simple "August 2026 ▾" pill button
+   (replaces the old savings % badge / prev-next arrows)
    ========================================================= */
 
 .month-selector{
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   background: rgba(255,255,255,0.06);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  padding: 4px;
+  padding: 8px 14px;
+  color: var(--text);
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
-
-.month-nav-btn{
-  flex: none;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
-}
-.month-nav-btn svg{ width: 15px; height: 15px; }
-.month-nav-btn:hover{ background: rgba(255,255,255,0.08); color: var(--text); }
-.month-nav-btn:active{ transform: scale(0.9); }
-
-.month-nav-btn:disabled{
-  opacity: 0.28;
-  pointer-events: none;
-}
-
-.month-nav-btn.is-create{
-  background: var(--primary-tint);
-  color: var(--primary);
-}
-.month-nav-btn.is-create:hover{ background: var(--primary-tint); filter: brightness(1.15); }
+.month-selector:hover{ background: rgba(255,255,255,0.09); }
+.month-selector:active{ transform: scale(0.96); }
 
 .month-label{
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
-  padding: 0 8px;
   white-space: nowrap;
-  min-width: 88px;
-  text-align: center;
   font-variant-numeric: tabular-nums;
-  transition: opacity 180ms ease;
 }
 
-.month-label.switching{ opacity: 0; }
+.month-caret{
+  width: 13px;
+  height: 13px;
+  color: var(--text-dim);
+  flex: none;
+}
+
+/* =========================================================
+   Month Picker sheet — list of all months + create action
+   ========================================================= */
+
+.month-picker-list{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.month-row{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 16px;
+  transition: background var(--dur) var(--ease);
+}
+.month-row:hover{ background: rgba(255,255,255,0.04); }
+
+.month-row-select{
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 10px 13px 14px;
+  text-align: left;
+  border-radius: 16px;
+}
+
+.month-row-check{
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+}
+.month-row-check svg{ width: 18px; height: 18px; }
+
+.month-row-label{
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.month-row.selected .month-row-label{
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.month-row-menu{
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin-right: 6px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.month-row-menu svg{ width: 18px; height: 18px; }
+.month-row-menu:hover{ background: rgba(255,255,255,0.08); color: var(--text); }
+.month-row-menu:active{ transform: scale(0.9); }
+
+.month-picker-divider{
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0 14px;
+}
+
+.month-picker-create{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  background: var(--primary-tint);
+  color: var(--primary);
+  border: 1px solid rgba(57,255,20,0.18);
+  font-size: 14.5px;
+  font-weight: 700;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  transition: transform var(--dur) var(--ease), filter var(--dur) var(--ease);
+}
+.month-picker-create:hover{ filter: brightness(1.12); }
+.month-picker-create:active{ transform: scale(0.97); }
+.month-picker-create svg{ width: 16px; height: 16px; }
+
+/* =========================================================
+   Small action sheet — used for the month row's ⋮ menu
+   ========================================================= */
+
+.action-sheet-btn{
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 16px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.action-sheet-btn:last-child{ margin-bottom: 0; }
+.action-sheet-btn:hover{ background: rgba(255,255,255,0.08); }
+.action-sheet-btn:active{ transform: scale(0.98); }
+.action-sheet-btn--danger{ color: var(--danger); }
 
 /* =========================================================
    Single-item action grid (Download PDF only)
@@ -378,7 +479,7 @@ button.stat:active{ transform: scale(0.97); }
 .action-sub{ font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* =========================================================
-   Primary CTA â€” Add Expense
+   Primary CTA — Add Expense
    ========================================================= */
 
 .cta-btn{
