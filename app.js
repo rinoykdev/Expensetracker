@@ -190,7 +190,7 @@
 
   let pendingEditId = null; // expense currently being edited (null = adding new)
   let pendingDeleteId = null; // expense pending delete confirmation
-  let pendingNewMonthKey = null; // month key about to be created
+  let pendingActionMonthKey = null; // month key targeted by the ⋮ action sheet / delete confirm
   let selectedType = "recurring"; // currently selected type in the expense sheet
 
   /* ---------------------------------------------------------
@@ -206,10 +206,21 @@
     rateValue: $("rateValue"),
     incomeStat: $("incomeStat"),
 
-    monthSelector: $("monthSelector"),
     monthLabel: $("monthLabel"),
-    prevMonthBtn: $("prevMonthBtn"),
-    nextMonthBtn: $("nextMonthBtn"),
+    monthSelectorBtn: $("monthSelectorBtn"),
+
+    monthPickerOverlay: $("monthPickerOverlay"),
+    monthPickerList: $("monthPickerList"),
+    createMonthBtn: $("createMonthBtn"),
+
+    monthActionOverlay: $("monthActionOverlay"),
+    deleteMonthMenuBtn: $("deleteMonthMenuBtn"),
+    cancelMonthActionBtn: $("cancelMonthActionBtn"),
+
+    deleteMonthOverlay: $("deleteMonthOverlay"),
+    deleteMonthName: $("deleteMonthName"),
+    cancelDeleteMonthBtn: $("cancelDeleteMonthBtn"),
+    confirmDeleteMonthBtn: $("confirmDeleteMonthBtn"),
 
     downloadPdfBtn: $("downloadPdfBtn"),
     downloadPdfSub: $("downloadPdfSub"),
@@ -235,12 +246,6 @@
     expenseTypeSegment: $("expenseTypeSegment"),
     saveExpenseBtn: $("saveExpenseBtn"),
     cancelExpenseBtn: $("cancelExpenseBtn"),
-
-    newMonthOverlay: $("newMonthOverlay"),
-    newMonthName: $("newMonthName"),
-    newMonthPrevName: $("newMonthPrevName"),
-    cancelNewMonthBtn: $("cancelNewMonthBtn"),
-    confirmNewMonthBtn: $("confirmNewMonthBtn"),
 
     deleteOverlay: $("deleteOverlay"),
     deleteDesc: $("deleteDesc"),
@@ -419,27 +424,7 @@
   };
 
   const renderMonthSelector = () => {
-    const keys = sortedMonthKeys();
-    const idx = keys.indexOf(state.currentMonth);
-    const isLatest = idx === keys.length - 1;
-
     els.monthLabel.textContent = monthKeyToLabel(state.currentMonth);
-    els.prevMonthBtn.disabled = idx <= 0;
-
-    const iconNext = els.nextMonthBtn.querySelector(".icon-next");
-    const iconPlus = els.nextMonthBtn.querySelector(".icon-plus");
-
-    if (isLatest) {
-      iconNext.hidden = true;
-      iconPlus.hidden = false;
-      els.nextMonthBtn.classList.add("is-create");
-      els.nextMonthBtn.setAttribute("aria-label", "Create next month");
-    } else {
-      iconNext.hidden = false;
-      iconPlus.hidden = true;
-      els.nextMonthBtn.classList.remove("is-create");
-      els.nextMonthBtn.setAttribute("aria-label", "Next month");
-    }
 
     if (els.downloadPdfSub) {
       els.downloadPdfSub.textContent = `Export ${monthKeyToLabel(state.currentMonth)}`;
@@ -521,7 +506,14 @@
   };
 
   // Close on backdrop click
-  [els.incomeOverlay, els.expenseOverlay, els.newMonthOverlay, els.deleteOverlay].forEach((overlay) => {
+  [
+    els.incomeOverlay,
+    els.expenseOverlay,
+    els.deleteOverlay,
+    els.monthPickerOverlay,
+    els.monthActionOverlay,
+    els.deleteMonthOverlay,
+  ].forEach((overlay) => {
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) closeSheet(overlay);
     });
@@ -534,59 +526,85 @@
   });
 
   /* ---------------------------------------------------------
-     Month navigation
+     Month switching (shared by the picker + month creation)
      --------------------------------------------------------- */
   const switchMonth = (key) => {
     ensureMonth(key);
     state.currentMonth = key;
     saveData();
+    renderAll();
+  };
 
-    // Brief fade on the label so the change reads as intentional, not a jump-cut.
-    els.monthLabel.classList.add("switching");
-    requestAnimationFrame(() => {
-      renderAll();
-      requestAnimationFrame(() => els.monthLabel.classList.remove("switching"));
+  const checkIconSVG = `<svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 6.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const menuDotsSVG = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5.5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="18.5" r="1.6" fill="currentColor"/></svg>`;
+
+  /* ---------------------------------------------------------
+     Month Picker sheet — lists every stored month, newest first
+     --------------------------------------------------------- */
+  const renderMonthPickerList = () => {
+    // Newest first, per spec — sortedMonthKeys() is ascending, so reverse it.
+    const keysNewestFirst = [...sortedMonthKeys()].reverse();
+
+    els.monthPickerList.innerHTML = "";
+
+    keysNewestFirst.forEach((key) => {
+      const isSelected = key === state.currentMonth;
+
+      const row = document.createElement("div");
+      row.className = `month-row${isSelected ? " selected" : ""}`;
+      row.dataset.key = key;
+
+      row.innerHTML = `
+        <button class="month-row-select" type="button">
+          <span class="month-row-check">${isSelected ? checkIconSVG : ""}</span>
+          <span class="month-row-label">${escapeHTML(monthKeyToLabel(key))}</span>
+        </button>
+        <button class="month-row-menu" type="button" aria-label="More options for ${escapeHTML(monthKeyToLabel(key))}">
+          ${menuDotsSVG}
+        </button>
+      `;
+
+      row.querySelector(".month-row-select").addEventListener("click", () => {
+        switchMonth(key);
+        closeSheet(els.monthPickerOverlay);
+      });
+
+      row.querySelector(".month-row-menu").addEventListener("click", (e) => {
+        e.stopPropagation();
+        pendingActionMonthKey = key;
+        closeSheet(els.monthPickerOverlay);
+        openSheet(els.monthActionOverlay);
+      });
+
+      els.monthPickerList.appendChild(row);
     });
   };
 
-  els.prevMonthBtn.addEventListener("click", () => {
-    const keys = sortedMonthKeys();
-    const idx = keys.indexOf(state.currentMonth);
-    if (idx > 0) switchMonth(keys[idx - 1]);
-  });
-
-  els.nextMonthBtn.addEventListener("click", () => {
-    const keys = sortedMonthKeys();
-    const idx = keys.indexOf(state.currentMonth);
-    if (idx < keys.length - 1) {
-      switchMonth(keys[idx + 1]);
-    } else {
-      openNewMonthModal();
-    }
-  });
-
-  /* ---------------------------------------------------------
-     New Month modal
-     (replaces the old "Reset Month" flow — creates the next
-     month, copying income + recurring expenses, and leaving
-     one-time expenses behind in the current month, untouched)
-     --------------------------------------------------------- */
-  const openNewMonthModal = () => {
-    pendingNewMonthKey = addMonthsToKey(state.currentMonth, 1);
-    els.newMonthName.textContent = monthKeyToLabel(pendingNewMonthKey);
-    els.newMonthPrevName.textContent = monthKeyToLabel(state.currentMonth);
-    openSheet(els.newMonthOverlay);
+  const openMonthPicker = () => {
+    renderMonthPickerList();
+    openSheet(els.monthPickerOverlay);
   };
 
-  els.cancelNewMonthBtn.addEventListener("click", () => {
-    pendingNewMonthKey = null;
-    closeSheet(els.newMonthOverlay);
-  });
+  els.monthSelectorBtn.addEventListener("click", openMonthPicker);
 
-  els.confirmNewMonthBtn.addEventListener("click", () => {
-    if (!pendingNewMonthKey) return;
-    const newKey = pendingNewMonthKey;
-    const sourceData = getCurrentMonthData();
+  /* ---------------------------------------------------------
+     Create New Month
+     (suggests the next chronological month after the most recent
+     one on record; copies Income + Recurring Expenses, excludes
+     One-time Expenses, then switches to it immediately)
+     --------------------------------------------------------- */
+  const createNewMonth = () => {
+    const keys = sortedMonthKeys(); // ascending
+    const latestKey = keys[keys.length - 1];
+    const newKey = addMonthsToKey(latestKey, 1);
+
+    // Guard against ever duplicating/overwriting an existing month.
+    if (state.months[newKey]) {
+      switchMonth(newKey);
+      return;
+    }
+
+    const sourceData = state.months[latestKey];
 
     // Recurring expenses become independent records in the new month —
     // cloned with brand-new ids so editing one never touches the other.
@@ -600,8 +618,7 @@
         date: todayLabel(),
       }));
 
-    // The source month (state.currentMonth) is left completely untouched —
-    // we only ever read from it above, never mutate it.
+    // The source month is left completely untouched — only ever read above.
     state.months[newKey] = {
       income: sourceData.income, // copied, independent from here on
       expenses: clonedRecurring, // one-time expenses intentionally excluded
@@ -609,10 +626,76 @@
 
     state.currentMonth = newKey;
     saveData();
-    closeSheet(els.newMonthOverlay);
-    pendingNewMonthKey = null;
     renderAll();
     showToast(`${monthKeyToLabel(newKey)} created`);
+  };
+
+  els.createMonthBtn.addEventListener("click", () => {
+    closeSheet(els.monthPickerOverlay);
+    createNewMonth();
+  });
+
+  /* ---------------------------------------------------------
+     Month row ⋮ action sheet (Delete Month / Cancel)
+     --------------------------------------------------------- */
+  els.cancelMonthActionBtn.addEventListener("click", () => {
+    pendingActionMonthKey = null;
+    closeSheet(els.monthActionOverlay);
+  });
+
+  els.deleteMonthMenuBtn.addEventListener("click", () => {
+    if (!pendingActionMonthKey) return;
+
+    // Never allow deleting the last remaining month.
+    if (Object.keys(state.months).length <= 1) {
+      closeSheet(els.monthActionOverlay);
+      pendingActionMonthKey = null;
+      showToast("You can't delete your only month");
+      return;
+    }
+
+    els.deleteMonthName.textContent = monthKeyToLabel(pendingActionMonthKey);
+    closeSheet(els.monthActionOverlay);
+    openSheet(els.deleteMonthOverlay);
+  });
+
+  /* ---------------------------------------------------------
+     Delete Month confirmation
+     --------------------------------------------------------- */
+  els.cancelDeleteMonthBtn.addEventListener("click", () => {
+    pendingActionMonthKey = null;
+    closeSheet(els.deleteMonthOverlay);
+  });
+
+  els.confirmDeleteMonthBtn.addEventListener("click", () => {
+    if (!pendingActionMonthKey) return;
+
+    const keys = Object.keys(state.months);
+    if (keys.length <= 1) {
+      // Safety net — should be unreachable since the menu already guards this.
+      closeSheet(els.deleteMonthOverlay);
+      pendingActionMonthKey = null;
+      showToast("You can't delete your only month");
+      return;
+    }
+
+    const deletedKey = pendingActionMonthKey;
+    const wasCurrent = deletedKey === state.currentMonth;
+
+    // Delete only this month's data — every other month is untouched.
+    delete state.months[deletedKey];
+
+    if (wasCurrent) {
+      // Automatically switch to the most recent remaining month.
+      const remaining = Object.keys(state.months).sort();
+      state.currentMonth = remaining[remaining.length - 1];
+    }
+
+    saveData();
+    pendingActionMonthKey = null;
+    closeSheet(els.deleteMonthOverlay);
+    renderAll();
+    showToast(`${monthKeyToLabel(deletedKey)} deleted`);
   });
 
   /* ---------------------------------------------------------
