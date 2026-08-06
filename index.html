@@ -115,16 +115,28 @@
 
         </div>
 
-        <!-- Download PDF — full width, placed below the expense lists -->
-        <button class="action-btn action-btn--full" id="downloadPdfBtn">
-          <span class="action-icon action-icon--pdf">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H7C5.89543 2 5 2.89543 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 2V7H19" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-          </span>
-          <span class="action-text">
-            <span class="action-title">Download PDF</span>
-            <span class="action-sub" id="downloadPdfSub">Full monthly report</span>
-          </span>
-        </button>
+        <!-- Download PDF + Backup — equal-width pair, placed below the expense lists -->
+        <div class="action-grid">
+          <button class="action-btn" id="downloadPdfBtn">
+            <span class="action-icon action-icon--pdf">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H7C5.89543 2 5 2.89543 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 2V7H19" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="action-text">
+              <span class="action-title">Download PDF</span>
+              <span class="action-sub" id="downloadPdfSub">Full monthly report</span>
+            </span>
+          </button>
+
+          <button class="action-btn" id="backupBtn" type="button">
+            <span class="action-icon action-icon--backup">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 8L12 3L17 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15V18C4 19.6569 5.34315 21 7 21H17C18.6569 21 20 19.6569 20 18V15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="action-text">
+              <span class="action-title">Backup</span>
+              <span class="action-sub">Export or import data</span>
+            </span>
+          </button>
+        </div>
 
         <p class="privacy-note">
           <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7.5C8 5.567 9.567 4 11.5 4H12.5C14.433 4 16 5.567 16 7.5V10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -258,6 +270,58 @@
         <div class="sheet-actions">
           <button class="btn btn-ghost" id="cancelDeleteBtn">Cancel</button>
           <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== BACKUP SHEET (Export / Import) ===================== -->
+    <div class="sheet-overlay" id="backupOverlay">
+      <div class="sheet sheet--center" id="backupSheet" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
+        <div class="sheet-grabber"></div>
+        <h2 class="sheet-title" id="backupTitle" style="margin-bottom: 18px;">Backup</h2>
+
+        <div class="backup-options">
+          <button class="action-btn action-btn--full" id="exportBackupBtn" type="button">
+            <span class="action-icon action-icon--backup">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 15V3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 8L12 3L17 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15V18C4 19.6569 5.34315 21 7 21H17C18.6569 21 20 19.6569 20 18V15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="action-text">
+              <span class="action-title">Export Backup</span>
+              <span class="action-sub">Save all application data to a backup file</span>
+            </span>
+          </button>
+
+          <button class="action-btn action-btn--full" id="importBackupBtn" type="button">
+            <span class="action-icon action-icon--backup">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 10L12 15L7 10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15V18C4 19.6569 5.34315 21 7 21H17C18.6569 21 20 19.6569 20 18V15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="action-text">
+              <span class="action-title">Import Backup</span>
+              <span class="action-sub">Restore application data from a backup file</span>
+            </span>
+          </button>
+        </div>
+
+        <button class="action-sheet-btn" id="cancelBackupBtn" type="button">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Hidden native file picker used by Import Backup — accepts .json only -->
+    <input type="file" id="importFileInput" accept=".json,application/json" hidden />
+
+    <!-- ===================== IMPORT BACKUP CONFIRM MODAL ===================== -->
+    <div class="sheet-overlay" id="importConfirmOverlay">
+      <div class="sheet sheet--center" id="importConfirmSheet" role="dialog" aria-modal="true" aria-labelledby="importConfirmTitle">
+        <div class="sheet-grabber"></div>
+        <div class="warn-icon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 9V13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.2" r="1" fill="currentColor"/><path d="M10.29 3.86L1.82 18a1.5 1.5 0 001.29 2.25h17.78a1.5 1.5 0 001.29-2.25L13.71 3.86a1.5 1.5 0 00-2.42 0z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 class="sheet-title" id="importConfirmTitle">Import Backup?</h2>
+        <p class="sheet-desc">This will replace all data currently stored on this device.</p>
+
+        <div class="sheet-actions">
+          <button class="btn btn-ghost" id="cancelImportBtn">Cancel</button>
+          <button class="btn btn-primary" id="confirmImportBtn">Import</button>
         </div>
       </div>
     </div>
