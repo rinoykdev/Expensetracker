@@ -35,6 +35,11 @@
   // be written atomically (no risk of income and months getting out of sync).
   const DATA_KEY = "expenseTracker.data";
 
+  // Used to stamp exported backups and to sanity-check imported ones.
+  // Bumping this does NOT change the LocalStorage format above.
+  const APP_VERSION = "2.0.0";
+  const BACKUP_FORMAT = "expense-tracker-backup";
+
   const readJSON = (key, fallback) => {
     try {
       const raw = localStorage.getItem(key);
@@ -225,6 +230,17 @@
     downloadPdfBtn: $("downloadPdfBtn"),
     downloadPdfSub: $("downloadPdfSub"),
     addExpenseBtn: $("addExpenseBtn"),
+
+    backupBtn: $("backupBtn"),
+    backupOverlay: $("backupOverlay"),
+    exportBackupBtn: $("exportBackupBtn"),
+    importBackupBtn: $("importBackupBtn"),
+    cancelBackupBtn: $("cancelBackupBtn"),
+    importFileInput: $("importFileInput"),
+
+    importConfirmOverlay: $("importConfirmOverlay"),
+    cancelImportBtn: $("cancelImportBtn"),
+    confirmImportBtn: $("confirmImportBtn"),
 
     recurringGroup: $("recurringGroup"),
     recurringList: $("recurringList"),
@@ -513,6 +529,8 @@
     els.monthPickerOverlay,
     els.monthActionOverlay,
     els.deleteMonthOverlay,
+    els.backupOverlay,
+    els.importConfirmOverlay,
   ].forEach((overlay) => {
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) closeSheet(overlay);
@@ -1025,6 +1043,167 @@
       console.error(err);
       showToast("Could not generate PDF");
     }
+  });
+
+  /* ---------------------------------------------------------
+     Backup — Export / Import ALL application data
+     (does not alter DATA_KEY's on-disk shape; only reads/writes it)
+     --------------------------------------------------------- */
+
+  const todayISODate = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  els.backupBtn.addEventListener("click", () => openSheet(els.backupOverlay));
+  els.cancelBackupBtn.addEventListener("click", () => closeSheet(els.backupOverlay));
+
+  // ---- Export ----------------------------------------------------------
+  const buildBackupPayload = () => ({
+    backupFormat: BACKUP_FORMAT,
+    appVersion: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    currentMonth: state.currentMonth,
+    months: state.months,
+    settings: {}, // reserved for future app settings
+  });
+
+  const exportBackup = () => {
+    try {
+      const payload = buildBackupPayload();
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ExpenseTracker-Backup-${todayISODate()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("Backup exported");
+    } catch (err) {
+      console.error(err);
+      showToast("Could not export backup");
+    }
+  };
+
+  els.exportBackupBtn.addEventListener("click", () => {
+    closeSheet(els.backupOverlay);
+    exportBackup();
+  });
+
+  // ---- Import ------------------------------------------------------------
+
+  // Validates the parsed JSON has everything required to safely restore.
+  // Kept intentionally lenient about *extra* fields (future-compatible)
+  // but strict about the shape of what it actually reads.
+  const validateBackupData = (data) => {
+    if (!data || typeof data !== "object") return false;
+    if (!data.months || typeof data.months !== "object" || Array.isArray(data.months)) return false;
+
+    const monthKeys = Object.keys(data.months);
+    if (monthKeys.length === 0) return false;
+
+    for (const key of monthKeys) {
+      const month = data.months[key];
+      if (!month || typeof month !== "object") return false;
+      if (!Array.isArray(month.expenses)) return false;
+      if (month.income !== null && typeof month.income !== "number") return false;
+      for (const exp of month.expenses) {
+        if (!exp || typeof exp !== "object") return false;
+        if (typeof exp.id !== "string") return false;
+        if (typeof exp.name !== "string") return false;
+        if (typeof exp.amount !== "number") return false;
+        if (exp.type !== "recurring" && exp.type !== "onetime") return false;
+      }
+    }
+
+    if (data.currentMonth !== undefined && typeof data.currentMonth !== "string") return false;
+
+    return true;
+  };
+
+  let pendingImportData = null;
+
+  els.importBackupBtn.addEventListener("click", () => {
+    closeSheet(els.backupOverlay);
+    els.importFileInput.value = "";
+    els.importFileInput.click();
+  });
+
+  els.importFileInput.addEventListener("change", () => {
+    const file = els.importFileInput.files && els.importFileInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(String(reader.result));
+      } catch (err) {
+        showToast("Invalid backup file.");
+        return;
+      }
+
+      if (!validateBackupData(parsed)) {
+        showToast("Invalid backup file.");
+        return;
+      }
+
+      pendingImportData = parsed;
+      openSheet(els.importConfirmOverlay);
+    };
+    reader.onerror = () => {
+      showToast("Invalid backup file.");
+    };
+
+    try {
+      reader.readAsText(file);
+    } catch (err) {
+      console.error(err);
+      showToast("Invalid backup file.");
+    }
+  });
+
+  els.cancelImportBtn.addEventListener("click", () => {
+    pendingImportData = null;
+    closeSheet(els.importConfirmOverlay);
+  });
+
+  els.confirmImportBtn.addEventListener("click", () => {
+    if (!pendingImportData) {
+      closeSheet(els.importConfirmOverlay);
+      return;
+    }
+
+    const monthKeys = Object.keys(pendingImportData.months);
+    const restoredCurrentMonth =
+      typeof pendingImportData.currentMonth === "string" &&
+      pendingImportData.months[pendingImportData.currentMonth]
+        ? pendingImportData.currentMonth
+        : monthKeys.sort()[monthKeys.length - 1];
+
+    const restoredData = {
+      currentMonth: restoredCurrentMonth,
+      months: pendingImportData.months,
+    };
+
+    const writeOk = writeJSON(DATA_KEY, restoredData);
+    if (!writeOk) {
+      pendingImportData = null;
+      closeSheet(els.importConfirmOverlay);
+      showToast("Could not import backup");
+      return;
+    }
+
+    closeSheet(els.importConfirmOverlay);
+    // Reload so every part of the app (state, DOM, quote rotator, etc.)
+    // re-initializes cleanly from the freshly restored data.
+    window.location.reload();
   });
 
   /* ---------------------------------------------------------
