@@ -323,6 +323,14 @@ input{
 .action-sheet-btn:active{ transform: scale(0.98); }
 .action-sheet-btn--danger{ color: var(--danger); }
 
+/* Spacing wrapper for the Export/Import rows inside the Backup sheet */
+.backup-options{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+
 /* =========================================================
    Single-item action grid (Download PDF only)
    ========================================================= */
