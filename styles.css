@@ -444,11 +444,41 @@ button.stat:active{ transform: scale(0.97); }
    ========================================================= */
 
 .action-grid{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  justify-content: center;
   gap: 12px;
   animation: rise 520ms var(--ease) both;
   animation-delay: 40ms;
+}
+
+/* Scoped to the bottom Download PDF / Backup pair only — narrower,
+   centered buttons with icon-above-text so nothing overflows on
+   small screens. Does not affect .action-btn usage elsewhere. */
+.action-grid .action-btn{
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 200px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 18px 10px;
+}
+
+.action-grid .action-icon{ margin: 0 auto; }
+
+.action-grid .action-text{
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.action-grid .action-title,
+.action-grid .action-sub{
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .action-btn{
