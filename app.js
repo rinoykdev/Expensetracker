@@ -231,7 +231,7 @@
   let pendingEditId = null; // expense currently being edited (null = adding new)
   let pendingDeleteId = null; // expense pending delete confirmation
   let pendingActionMonthKey = null; // month key targeted by the ⋮ action sheet / delete confirm
-  let selectedType = "recurring"; // currently selected type in the expense sheet
+  let selectedType = "onetime"; // currently selected type in the expense sheet (default: One-Time)
 
   /* ---------------------------------------------------------
      DOM references
@@ -891,7 +891,7 @@
     els.expenseNameInput.value = "";
     els.expenseAmountInput.value = "";
     els.expenseCategoryInput.value = "";
-    setSelectedType("recurring");
+    setSelectedType("onetime");
     openSheet(els.expenseOverlay);
     setTimeout(() => els.expenseNameInput.focus(), 260);
   };
