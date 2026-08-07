@@ -40,6 +40,27 @@
   const APP_VERSION = "2.0.0";
   const BACKUP_FORMAT = "expense-tracker-backup";
 
+  // Remembers whether the Recurring / One-time sections are expanded or
+  // collapsed, independent of DATA_KEY so a bad read here can never
+  // touch actual expense data.
+  const UI_STATE_KEY = "expenseTracker.ui";
+
+  // Fixed category list for One-time Expenses (Recurring Expenses never
+  // use categories). Keyed by id so existing stored expenses that predate
+  // this feature (no `category` field) can safely fall back to "other".
+  const CATEGORY_MAP = {
+    food: { emoji: "🍔", label: "Food" },
+    fuel: { emoji: "⛽", label: "Fuel" },
+    shopping: { emoji: "🛍", label: "Shopping" },
+    entertainment: { emoji: "🎬", label: "Entertainment" },
+    software: { emoji: "💻", label: "Software" },
+    home: { emoji: "🏠", label: "Home" },
+    travel: { emoji: "🚗", label: "Travel" },
+    health: { emoji: "🏥", label: "Health" },
+    gifts: { emoji: "🎁", label: "Gifts" },
+    other: { emoji: "📦", label: "Other" },
+  };
+
   const readJSON = (key, fallback) => {
     try {
       const raw = localStorage.getItem(key);
@@ -178,6 +199,20 @@
 
   const saveData = () => writeJSON(DATA_KEY, state);
 
+  // ---------------------------------------------------------
+  // UI state (section expand/collapse) — separate key, separate from
+  // expense data on purpose so a corrupt read here never affects money data.
+  // Default is collapsed for both sections; once a user toggles a section,
+  // that choice is remembered on future launches.
+  // ---------------------------------------------------------
+  const loadedUIState = readJSON(UI_STATE_KEY, null);
+  const uiState =
+    loadedUIState && typeof loadedUIState === "object"
+      ? loadedUIState
+      : { recurringGroup: false, oneTimeGroup: false };
+
+  const saveUIState = () => writeJSON(UI_STATE_KEY, uiState);
+
   // Ensure a month record exists (used for the current month, and for any
   // month the user navigates to) — never overwrites existing data.
   const ensureMonth = (key) => {
@@ -248,7 +283,10 @@
     oneTimeGroup: $("oneTimeGroup"),
     oneTimeList: $("oneTimeList"),
     oneTimeTotal: $("oneTimeTotal"),
-    emptyState: $("emptyState"),
+
+    statsSection: $("statsSection"),
+    statsScroll: $("statsScroll"),
+    statsEmpty: $("statsEmpty"),
 
     incomeOverlay: $("incomeOverlay"),
     incomeInput: $("incomeInput"),
@@ -260,6 +298,8 @@
     expenseNameInput: $("expenseNameInput"),
     expenseAmountInput: $("expenseAmountInput"),
     expenseTypeSegment: $("expenseTypeSegment"),
+    categoryField: $("categoryField"),
+    expenseCategoryInput: $("expenseCategoryInput"),
     saveExpenseBtn: $("saveExpenseBtn"),
     cancelExpenseBtn: $("cancelExpenseBtn"),
 
@@ -498,13 +538,85 @@
 
     els.recurringGroup.hidden = recurring.length === 0;
     els.oneTimeGroup.hidden = oneTime.length === 0;
-    els.emptyState.hidden = monthData.expenses.length !== 0;
+  };
+
+  /* ---------------------------------------------------------
+     Statistics — grouped from One-time Expenses ONLY, for the
+     currently selected month. Recurring Expenses are never included.
+     --------------------------------------------------------- */
+  const RING_RADIUS = 16;
+  const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+  const computeCategoryStats = () => {
+    const monthData = getCurrentMonthData();
+    const oneTimeExpenses = monthData.expenses.filter((e) => e.type === "onetime");
+
+    const totalOneTime = oneTimeExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const totalsByCategory = {};
+    oneTimeExpenses.forEach((e) => {
+      const catId = e.category && CATEGORY_MAP[e.category] ? e.category : "other";
+      totalsByCategory[catId] = (totalsByCategory[catId] || 0) + e.amount;
+    });
+
+    const rows = Object.keys(totalsByCategory).map((catId) => {
+      const amount = totalsByCategory[catId];
+      const percent = totalOneTime > 0 ? (amount / totalOneTime) * 100 : 0;
+      return { catId, meta: CATEGORY_MAP[catId], amount, percent };
+    });
+
+    // Highest spending category first, lowest last.
+    rows.sort((a, b) => b.amount - a.amount);
+
+    return { rows, totalOneTime };
+  };
+
+  const buildStatCard = (row) => {
+    const card = document.createElement("div");
+    card.className = "stat-card";
+
+    const percentClamped = Math.max(0, Math.min(100, row.percent));
+    const dashOffset = RING_CIRCUMFERENCE * (1 - percentClamped / 100);
+
+    card.innerHTML = `
+      <span class="stat-card-icon">${row.meta.emoji}</span>
+      <span class="stat-card-name">${escapeHTML(row.meta.label)}</span>
+      <span class="stat-card-amount"><span class="rupee">₹</span>${formatINR(row.amount)}</span>
+      <div class="stat-ring">
+        <svg viewBox="0 0 40 40">
+          <circle class="ring-bg" cx="20" cy="20" r="${RING_RADIUS}"></circle>
+          <circle class="ring-fg" cx="20" cy="20" r="${RING_RADIUS}"
+            stroke-dasharray="${RING_CIRCUMFERENCE.toFixed(2)}"
+            stroke-dashoffset="${dashOffset.toFixed(2)}"></circle>
+        </svg>
+        <span class="stat-ring-label">${Math.round(percentClamped)}%</span>
+      </div>
+    `;
+
+    return card;
+  };
+
+  const renderStats = () => {
+    const { rows } = computeCategoryStats();
+
+    els.statsScroll.innerHTML = "";
+
+    if (rows.length === 0) {
+      els.statsScroll.hidden = true;
+      els.statsEmpty.hidden = false;
+      return;
+    }
+
+    els.statsEmpty.hidden = true;
+    els.statsScroll.hidden = false;
+    rows.forEach((row) => els.statsScroll.appendChild(buildStatCard(row)));
   };
 
   const renderAll = () => {
     renderMonthSelector();
     renderHero();
     renderExpenses();
+    renderStats();
   };
 
   /* ---------------------------------------------------------
@@ -762,6 +874,11 @@
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-checked", String(active));
     });
+
+    // Category is only relevant (and required) for One-time expenses.
+    const isOneTime = type === "onetime";
+    els.categoryField.hidden = !isOneTime;
+    if (!isOneTime) els.expenseCategoryInput.value = "";
   };
 
   els.expenseTypeSegment.querySelectorAll(".segment").forEach((btn) => {
@@ -773,6 +890,7 @@
     els.expenseTitle.textContent = "Add Expense";
     els.expenseNameInput.value = "";
     els.expenseAmountInput.value = "";
+    els.expenseCategoryInput.value = "";
     setSelectedType("recurring");
     openSheet(els.expenseOverlay);
     setTimeout(() => els.expenseNameInput.focus(), 260);
@@ -786,6 +904,9 @@
     els.expenseNameInput.value = expense.name;
     els.expenseAmountInput.value = expense.amount;
     setSelectedType(expense.type);
+    if (expense.type === "onetime") {
+      els.expenseCategoryInput.value = expense.category && CATEGORY_MAP[expense.category] ? expense.category : "";
+    }
     openSheet(els.expenseOverlay);
     setTimeout(() => els.expenseNameInput.focus(), 260);
   };
@@ -808,6 +929,16 @@
       return;
     }
 
+    let category = null;
+    if (selectedType === "onetime") {
+      category = els.expenseCategoryInput.value;
+      if (!category) {
+        els.expenseCategoryInput.focus();
+        showToast("Select a category");
+        return;
+      }
+    }
+
     const monthData = getCurrentMonthData();
 
     if (pendingEditId) {
@@ -816,6 +947,11 @@
         expense.name = name;
         expense.amount = amount;
         expense.type = selectedType;
+        if (selectedType === "onetime") {
+          expense.category = category;
+        } else {
+          delete expense.category;
+        }
       }
       showToast("Expense updated");
     } else {
@@ -825,6 +961,7 @@
         amount,
         type: selectedType,
         date: todayLabel(),
+        ...(selectedType === "onetime" ? { category } : {}),
       });
       showToast("Expense added");
     }
@@ -874,12 +1011,22 @@
   });
 
   /* ---------------------------------------------------------
-     Group collapsing
+     Group collapsing — collapsed by default on every fresh load;
+     the user's expanded/collapsed choice is remembered per section.
      --------------------------------------------------------- */
+  const applyInitialSectionState = () => {
+    [els.recurringGroup, els.oneTimeGroup].forEach((group) => {
+      const isExpanded = uiState[group.id] === true;
+      group.classList.toggle("collapsed", !isExpanded);
+    });
+  };
+
   document.querySelectorAll(".group-header").forEach((header) => {
     header.addEventListener("click", () => {
       const group = header.closest(".expense-group");
       group.classList.toggle("collapsed");
+      uiState[group.id] = !group.classList.contains("collapsed");
+      saveUIState();
     });
   });
 
@@ -1212,6 +1359,7 @@
      migrated users already have income and are never prompted)
      --------------------------------------------------------- */
   const init = () => {
+    applyInitialSectionState();
     renderAll();
     initQuoteRotator();
     const monthData = getCurrentMonthData();
