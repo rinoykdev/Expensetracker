@@ -3,13 +3,14 @@
    Cache-first strategy for full offline support.
    ========================================================= */
 
-const CACHE_NAME = "expense-tracker-cache-v1";
+const CACHE_NAME = "expense-tracker-cache-v2";
 
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./sync.js",
   "./jspdf.umd.min.js",
   "./manifest.json",
   "./icons/icon-192.png",
@@ -46,6 +47,10 @@ self.addEventListener("activate", (event) => {
 // Fetch: cache-first, fall back to network, then offline page for navigations
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  // Never intercept other origins (Supabase auth / database calls) — those
+  // must always go straight to the network and are never cached.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
