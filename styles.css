@@ -836,6 +836,150 @@ button.stat:active{ transform: scale(0.97); }
 }
 .stats-empty[hidden]{ display: none; }
 
+/* =========================================================
+   Cloud sync card (email + password) — status dot, title,
+   email · time, and pill buttons
+   ========================================================= */
+
+.sync-card{
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 22px 22px 20px;
+  box-shadow: var(--shadow-card);
+  animation: rise 520ms var(--ease) both;
+  animation-delay: 180ms;
+}
+
+.sync-card[hidden]{ display: none; }
+
+.sync-head{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sync-dot{
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  box-shadow: none;
+  transition: background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.sync-text{
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sync-title{
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.sync-sub{
+  font-size: 13.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sync-form{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sync-form[hidden]{ display: none; }
+
+.sync-input{
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: inherit;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.sync-input::placeholder{ color: var(--text-faint); font-weight: 500; }
+.sync-input:focus{
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-tint-soft);
+}
+
+.sync-msg{
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+.sync-msg[hidden]{ display: none; }
+.sync-msg--info{ color: var(--primary); }
+
+.sync-actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sync-actions[hidden]{ display: none; }
+
+.sync-btn{
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 13px 22px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+@media (hover: hover){
+  .sync-btn:hover{ border-color: var(--primary); color: var(--text); }
+}
+.sync-btn:active{ transform: scale(0.97); }
+.sync-btn:disabled{ opacity: 0.45; pointer-events: none; }
+
+/* Status dot colours */
+.sync-card[data-state="synced"] .sync-dot{
+  background: var(--primary);
+  box-shadow: 0 0 12px 2px var(--primary-glow);
+}
+.sync-card[data-state="syncing"] .sync-dot{
+  background: var(--primary);
+  box-shadow: 0 0 12px 2px var(--primary-glow);
+  animation: syncPulse 1.1s ease-in-out infinite;
+}
+.sync-card[data-state="offline"] .sync-dot{
+  background: #FFB020;
+  box-shadow: 0 0 12px 2px rgba(255,176,32,0.35);
+}
+.sync-card[data-state="error"] .sync-dot{
+  background: var(--danger);
+  box-shadow: 0 0 12px 2px rgba(255,77,77,0.35);
+}
+
+@keyframes syncPulse{
+  0%, 100%{ opacity: 1; transform: scale(1); }
+  50%{ opacity: 0.45; transform: scale(0.8); }
+}
+
 .privacy-note{
   display: flex;
   align-items: center;
