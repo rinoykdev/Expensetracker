@@ -145,9 +145,37 @@
           </button>
         </div>
 
+        <!-- Cloud sync — email + password account; becomes the "Synced" card once signed in -->
+        <section class="sync-card" id="syncCard" data-state="signedOut" aria-live="polite">
+          <div class="sync-head">
+            <span class="sync-dot" id="syncDot"></span>
+            <div class="sync-text">
+              <span class="sync-title" id="syncTitle">Cloud sync</span>
+              <span class="sync-sub" id="syncSub">Sign in to back up and sync your data</span>
+            </div>
+          </div>
+
+          <!-- Signed out -->
+          <div class="sync-form" id="syncForm">
+            <input type="email" id="syncEmail" class="sync-input" placeholder="Email" autocomplete="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            <input type="password" id="syncPassword" class="sync-input" placeholder="Password" autocomplete="current-password" />
+            <p class="sync-msg" id="syncMsg" hidden></p>
+            <div class="sync-actions">
+              <button class="sync-btn" id="syncSignInBtn" type="button">Sign in</button>
+              <button class="sync-btn" id="syncSignUpBtn" type="button">Create account</button>
+            </div>
+          </div>
+
+          <!-- Signed in -->
+          <div class="sync-actions" id="syncActions" hidden>
+            <button class="sync-btn" id="syncNowBtn" type="button">Sync now</button>
+            <button class="sync-btn" id="syncSignOutBtn" type="button">Sign out</button>
+          </div>
+        </section>
+
         <p class="privacy-note">
           <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7.5C8 5.567 9.567 4 11.5 4H12.5C14.433 4 16 5.567 16 7.5V10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          All data is saved on your device only. 100% Private
+          <span id="privacyText">All data is saved on your device only. 100% Private</span>
         </p>
 
       </div>
@@ -356,6 +384,7 @@
   </div>
 
   <script src="jspdf.umd.min.js"></script>
+  <script src="sync.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
