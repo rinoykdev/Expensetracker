@@ -197,7 +197,17 @@
         months: {},
       };
 
-  const saveData = () => writeJSON(DATA_KEY, state);
+  // Cloud sync (sync.js). Set up near the bottom of this file; stays null
+  // if sync.js isn't available, in which case the app behaves exactly as before.
+  let syncStore = null;
+
+  // Every save lands in localStorage FIRST (instant, works offline), then the
+  // change is queued for the server in the background.
+  const saveData = () => {
+    const ok = writeJSON(DATA_KEY, state);
+    if (ok && syncStore) syncStore.commit();
+    return ok;
+  };
 
   // ---------------------------------------------------------
   // UI state (section expand/collapse) — separate key, separate from
@@ -307,6 +317,20 @@
     deleteDesc: $("deleteDesc"),
     cancelDeleteBtn: $("cancelDeleteBtn"),
     confirmDeleteBtn: $("confirmDeleteBtn"),
+
+    syncCard: $("syncCard"),
+    syncTitle: $("syncTitle"),
+    syncSub: $("syncSub"),
+    syncForm: $("syncForm"),
+    syncEmail: $("syncEmail"),
+    syncPassword: $("syncPassword"),
+    syncMsg: $("syncMsg"),
+    syncSignInBtn: $("syncSignInBtn"),
+    syncSignUpBtn: $("syncSignUpBtn"),
+    syncActions: $("syncActions"),
+    syncNowBtn: $("syncNowBtn"),
+    syncSignOutBtn: $("syncSignOutBtn"),
+    privacyText: $("privacyText"),
 
     toast: $("toast"),
   };
@@ -1347,11 +1371,199 @@
       return;
     }
 
+    // If signed in, queue the restored data (and removal of whatever it
+    // replaces) so the cloud mirrors the restore after the reload.
+    if (syncStore) syncStore.commit(restoredData);
+
     closeSheet(els.importConfirmOverlay);
     // Reload so every part of the app (state, DOM, quote rotator, etc.)
     // re-initializes cleanly from the freshly restored data.
     window.location.reload();
   });
+
+  /* ---------------------------------------------------------
+     Cloud sync card (email + password) — logic lives in sync.js.
+     The UI never waits on the network: it reads localStorage only.
+     --------------------------------------------------------- */
+  const DEFAULT_PRIVACY_TEXT = els.privacyText.textContent;
+  let firstLaunchPrompt = false; // true while the "set your income" welcome sheet is showing
+
+  const timeAgo = (ts) => {
+    if (!ts) return "not synced yet";
+    const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (sec < 45) return "just now";
+    const min = Math.round(sec / 60);
+    if (min < 60) return `${min} min ago`;
+    const hr = Math.round(min / 60);
+    if (hr < 24) return `${hr} h ago`;
+    const day = Math.round(hr / 24);
+    return day === 1 ? "yesterday" : `${day} days ago`;
+  };
+
+  const setSyncMsg = (text, kind) => {
+    els.syncMsg.textContent = text || "";
+    els.syncMsg.hidden = !text;
+    els.syncMsg.classList.toggle("sync-msg--info", kind === "info");
+  };
+
+  const renderSyncCard = () => {
+    if (!syncStore) return;
+    const st = syncStore.getStatus();
+    const signedIn = syncStore.isSignedIn();
+
+    els.syncCard.dataset.state = signedIn ? st.state : st.state === "unconfigured" ? "unconfigured" : "signedOut";
+    els.syncActions.hidden = !signedIn;
+    els.syncForm.hidden = signedIn || st.state === "unconfigured";
+    els.privacyText.textContent = signedIn
+      ? "Saved on this device and synced to your private account"
+      : DEFAULT_PRIVACY_TEXT;
+
+    if (!signedIn) {
+      els.syncTitle.textContent = "Cloud sync";
+      els.syncSub.textContent =
+        st.state === "unconfigured"
+          ? "Not set up yet — add your Supabase keys in sync.js"
+          : "Sign in to back up and sync your data";
+      return;
+    }
+
+    const email = st.email || "";
+    const pending = syncStore.pendingCount();
+    if (st.state === "syncing") {
+      els.syncTitle.textContent = "Syncing…";
+      els.syncSub.textContent = `${email} · syncing`;
+    } else if (st.state === "offline") {
+      els.syncTitle.textContent = "Offline";
+      els.syncSub.textContent = pending
+        ? `${email} · ${pending} change${pending === 1 ? "" : "s"} waiting`
+        : `${email} · will sync when you're back online`;
+    } else if (st.state === "error") {
+      els.syncTitle.textContent = "Sync error";
+      els.syncSub.textContent = st.message || email;
+    } else {
+      els.syncTitle.textContent = "Synced";
+      els.syncSub.textContent = `${email} · ${timeAgo(st.lastSyncAt)}`;
+    }
+    els.syncNowBtn.disabled = st.state === "syncing";
+  };
+
+  // Older records could (rarely) lack an id or repeat one inside a month.
+  // Sync needs a unique id per expense, so repair that quietly — only
+  // touches an expense that actually has no usable id.
+  const repairExpenseIds = () => {
+    let changed = false;
+    Object.keys(state.months).forEach((mk) => {
+      const list = state.months[mk] && state.months[mk].expenses;
+      if (!Array.isArray(list)) return;
+      const seen = new Set();
+      list.forEach((e) => {
+        if (!e.id || seen.has(e.id)) {
+          e.id = uid();
+          changed = true;
+        }
+        seen.add(e.id);
+      });
+    });
+    if (changed) writeJSON(DATA_KEY, state);
+  };
+
+  const submitSyncAuth = async (mode) => {
+    const email = els.syncEmail.value.trim();
+    const password = els.syncPassword.value;
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setSyncMsg("Enter a valid email address");
+      els.syncEmail.focus();
+      return;
+    }
+    if (!password || (mode === "signup" && password.length < 6)) {
+      setSyncMsg(mode === "signup" ? "Password must be at least 6 characters" : "Enter your password");
+      els.syncPassword.focus();
+      return;
+    }
+
+    setSyncMsg("");
+    els.syncSignInBtn.disabled = true;
+    els.syncSignUpBtn.disabled = true;
+    const res =
+      mode === "signup"
+        ? await syncStore.signUp(email, password)
+        : await syncStore.signIn(email, password);
+    els.syncSignInBtn.disabled = false;
+    els.syncSignUpBtn.disabled = false;
+
+    if (!res.ok) {
+      setSyncMsg(res.error);
+      return;
+    }
+    if (res.needsConfirmation) {
+      setSyncMsg("Account created. Confirm it from the email we sent, then tap Sign in.", "info");
+      return;
+    }
+    els.syncEmail.value = "";
+    els.syncPassword.value = "";
+    showToast(mode === "signup" ? "Account created" : "Signed in");
+  };
+
+  const initSync = () => {
+    repairExpenseIds();
+
+    if (!window.ExpenseSync) {
+      els.syncCard.hidden = true;
+      return;
+    }
+
+    syncStore = window.ExpenseSync.createStore({
+      getSnapshot: () => state,
+      // Called when the server's data replaces the local cache.
+      applySnapshot: (snap) => {
+        state.months = snap.months;
+        if (!state.months[state.currentMonth]) {
+          const keys = Object.keys(state.months).sort();
+          state.currentMonth = keys.length ? keys[keys.length - 1] : currentMonthKey();
+        }
+        ensureMonth(state.currentMonth);
+        writeJSON(DATA_KEY, state);
+      },
+    });
+
+    syncStore.onStatus(renderSyncCard);
+    syncStore.onChange(() => {
+      renderAll();
+      // Second device: the welcome "set income" sheet is moot once data arrives.
+      if (
+        firstLaunchPrompt &&
+        els.incomeOverlay.classList.contains("open") &&
+        getCurrentMonthData().income != null
+      ) {
+        closeSheet(els.incomeOverlay);
+        firstLaunchPrompt = false;
+      }
+    });
+
+    els.syncSignInBtn.addEventListener("click", () => submitSyncAuth("signin"));
+    els.syncSignUpBtn.addEventListener("click", () => submitSyncAuth("signup"));
+    els.syncPassword.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitSyncAuth("signin");
+    });
+
+    els.syncNowBtn.addEventListener("click", async () => {
+      await syncStore.syncNow();
+      const st = syncStore.getStatus();
+      if (st.state === "synced") showToast("Synced");
+      else if (st.state === "offline") showToast("You're offline — changes will sync later");
+      else if (st.state === "error") showToast(st.message || "Sync failed");
+    });
+
+    els.syncSignOutBtn.addEventListener("click", async () => {
+      await syncStore.signOut();
+      showToast("Signed out — your data stays on this device");
+    });
+
+    renderSyncCard();
+    setInterval(renderSyncCard, 30000); // keeps "just now" → "5 min ago" fresh
+    syncStore.start();
+  };
 
   /* ---------------------------------------------------------
      First launch check
@@ -1364,8 +1576,10 @@
     initQuoteRotator();
     const monthData = getCurrentMonthData();
     if (monthData.income === null || monthData.income === undefined) {
+      firstLaunchPrompt = true;
       openIncomeModal(true);
     }
+    initSync();
   };
 
   init();
